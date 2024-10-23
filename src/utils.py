@@ -6,6 +6,7 @@ import sys
 
 from sklearn.metrics.cluster import adjusted_rand_score
 from sklearn.cluster import KMeans
+from sklearn.cluster import DBSCAN
 from sklearn.cluster import SpectralClustering
 from sklearn.metrics import r2_score
 import matplotlib.pyplot as plt
@@ -14,9 +15,9 @@ from sklearn.metrics import silhouette_score
 import seaborn as sns
 
 
-def tsne_get(whole_exp, labels):
+def tsne_get(whole_exp, labels, cluster='kmean'):
     i = 0
-    best = (0,0)
+    best = (0,0,0)
     tsne_df = TSNE(n_components=2).fit_transform(whole_exp)
     #tsne_df = TSNE(n_components=2, init='pca').fit_transform(whole_exp.cpu().detach().data)
     #tsne_df = whole_exp
@@ -26,19 +27,24 @@ def tsne_get(whole_exp, labels):
     df['tsne2'] = tsne_df[:,1]
     df['label'] = labels
 
-    best_kmeans_label = []
-    #print(whole_exp, whole_exp.shape, len(whole_key))
-    for kn in range(4,12):
-        kmeans = KMeans(n_clusters = kn, n_init=20, max_iter=100).fit(tsne_df)
+    if cluster:
+        best_kmeans_label = []
+        #print(whole_exp, whole_exp.shape, len(whole_key))
+        for kn in range(2,len(set(labels))+4):
+            if cluster == 'kmean':
+                kmeans = KMeans(n_clusters = kn, n_init=20, max_iter=50).fit(tsne_df)
+            elif cluster == 'dbscan':
+                kmeans = DBSCAN(eps=0.5 * kn, min_samples=10).fit(tsne_df)
 
-        test_ari = adjusted_rand_score(kmeans.labels_, labels)
-        sil = silhouette_score(tsne_df, kmeans.labels_)
-        if best[1] < test_ari:
-            best = (kn, test_ari, sil)
-            best_kmeans_label = kmeans.labels_
+            test_ari = adjusted_rand_score(kmeans.labels_, labels)
+            if (len(set(kmeans.labels_)) > 1):
+                sil = silhouette_score(tsne_df, kmeans.labels_)
+            if best[1] < test_ari:
+                best = (len(set(kmeans.labels_)), test_ari, sil)
+                best_kmeans_label = kmeans.labels_
 
-        #print(Counter(kmeans.labels_), Counter(whole_key))
-    print('kmeans #cluster:', best[0], 'ARI:', best[1], 'Silhouette:', best[2])
+            #print(Counter(kmeans.labels_), Counter(whole_key))
+        print(cluster, '#cluster:', best)
     return best, df
 
 
